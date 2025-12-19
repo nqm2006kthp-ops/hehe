@@ -42,12 +42,40 @@
     let titleMesh, starMesh, loveMesh;
     let bgMusic = new Audio("./audio.mp3"); bgMusic.loop = true;
 
-    let wakeLock = null; let idleTimer = null; const IDLE_TIME_LIMIT = 30000;
-    async function requestWakeLock() { if ('wakeLock' in navigator && !wakeLock) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {} } }
-    function releaseWakeLock() { if (wakeLock) { wakeLock.release().then(() => { wakeLock = null; }); } }
-    function resetEnergyTimer(isActive) { if (isActive) { requestWakeLock(); if (idleTimer) clearTimeout(idleTimer); idleTimer = setTimeout(() => releaseWakeLock(), IDLE_TIME_LIMIT); } }
+    // --- QUẢN LÝ NGUỒN ĐIỆN (ĐÃ SỬA LỖI) ---
+    let wakeLock = null;
+    let idleTimer = null;
+    const IDLE_TIME_LIMIT = 30000; 
 
-    window.addEventListener('resize', () => { if (!camera || !renderer) return; camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator && !wakeLock) {
+            try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+        }
+    }
+
+    function releaseWakeLock() {
+        if (wakeLock) { wakeLock.release().then(() => { wakeLock = null; }); }
+    }
+
+    function resetEnergyTimer(isActive) {
+        if (isActive) {
+            requestWakeLock();
+            if (idleTimer) clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => releaseWakeLock(), IDLE_TIME_LIMIT);
+        } else {
+            // Nếu không có thao tác (TREE), bộ đếm vẫn chạy để chuẩn bị tắt màn hình
+            if (!idleTimer) {
+                idleTimer = setTimeout(() => releaseWakeLock(), IDLE_TIME_LIMIT);
+            }
+        }
+    }
+
+    window.addEventListener('resize', () => {
+        if (!camera || !renderer) return;
+        camera.aspect = window.innerWidth/window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 
     function createDecorations() {
         const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
@@ -129,27 +157,47 @@
 
     async function startSystem() {
         document.getElementById('btnStart').style.display = 'none'; document.getElementById('controls').style.display = 'flex';
-        bgMusic.load(); bgMusic.play().catch(e => console.log("Cần tương tác"));
+        // Sửa lỗi kích hoạt âm thanh chuẩn
+        bgMusic.load(); 
+        bgMusic.play().then(() => console.log("Audio playing")).catch(e => console.log("User interaction required"));
+
         init3D();
         const video = document.getElementsByClassName('input_video')[0];
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.85, minTrackingConfidence: 0.8 });
+        
+        // Tối ưu hóa Model Complexity cho từng loại thiết bị
+        hands.setOptions({ 
+            maxNumHands: 2, 
+            modelComplexity: isMobile ? 0 : 1, 
+            minDetectionConfidence: 0.7, 
+            minTrackingConfidence: 0.7 
+        });
+
         hands.onResults(results => {
             const cv = document.getElementById('camera-preview'); const ctx = cv.getContext('2d'); ctx.clearRect(0,0,cv.width, cv.height); ctx.drawImage(results.image, 0, 0, cv.width, cv.height);
             let active = false;
-            if (results.multiHandLandmarks.length === 2) {
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length === 2) {
                 const h1 = results.multiHandLandmarks[0]; const h2 = results.multiHandLandmarks[1];
                 const dIdx = Math.hypot(h1[8].x - h2[8].x, h1[8].y - h2[8].y); const dThm = Math.hypot(h1[4].x - h2[4].x, h1[4].y - h2[4].y);
-                if (dIdx < 0.15 && dThm < 0.15) { state = 'HEART'; active = true; } else { state = 'EXPLODE'; active = true; }
-            } else if (results.multiHandLandmarks.length === 1) {
+                // Nới lỏng ngưỡng trái tim để dễ nhận diện hơn (0.25)
+                if (dIdx < 0.25 && dThm < 0.25) { state = 'HEART'; active = true; } else { state = 'EXPLODE'; active = true; }
+            } else if (results.multiHandLandmarks && results.multiHandLandmarks.length === 1) {
                 const lm = results.multiHandLandmarks[0]; const openD = Math.hypot(lm[8].x-lm[0].x, lm[8].y-lm[0].y); const pinchD = Math.hypot(lm[4].x-lm[8].x, lm[4].y-lm[8].y);
-                if (pinchD < 0.08) { state = 'PHOTO'; active = true; } else if (openD > 0.38) { state = 'EXPLODE'; active = true; } else state = 'TREE';
+                if (pinchD < 0.08) { state = 'PHOTO'; active = true; } else if (openD > 0.35) { state = 'EXPLODE'; active = true; } else state = 'TREE';
             } else { state = 'TREE'; }
+            
             resetEnergyTimer(active);
         });
-        const cam = new Camera(video, { onFrame: async () => { await hands.send({image: video}); }, width: 1280, height: 720 });
+
+        const cam = new Camera(video, { 
+            onFrame: async () => { await hands.send({image: video}); }, 
+            width: isMobile ? 640 : 1280, 
+            height: isMobile ? 480 : 720 
+        });
         cam.start();
     }
+
     document.getElementById('file-input').addEventListener('change', handleUpload);
     document.getElementById('folder-input').addEventListener('change', handleUpload);
     document.addEventListener('visibilitychange', async () => { if (wakeLock !== null && document.visibilityState === 'visible') { await requestWakeLock(); } });
