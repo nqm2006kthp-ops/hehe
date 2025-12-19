@@ -115,34 +115,44 @@
         }
 
         function createParticleGroup(color, count) {
-            const geo = new THREE.BufferGeometry();
-            const pos = new Float32Array(count * 3);
-            const treeT = new Float32Array(count * 3);
-            const explodeT = new Float32Array(count * 3);
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const treeT = new Float32Array(count * 3);
+    const explodeT = new Float32Array(count * 3);
+    const heartT = new Float32Array(count * 3); // Thêm tọa độ trái tim
 
-            for(let i=0; i<count; i++) {
-                // Tọa độ Cây thông
-                const h = Math.random() * CONFIG.treeHeight;
-                const r = ((CONFIG.treeHeight - h) / CONFIG.treeHeight) * CONFIG.treeBaseRadius * Math.sqrt(Math.random());
-                const theta = Math.random() * Math.PI * 2;
-                treeT[i*3] = r * Math.cos(theta);
-                treeT[i*3+1] = h - CONFIG.treeHeight/2;
-                treeT[i*3+2] = r * Math.sin(theta);
+    for(let i=0; i<count; i++) {
+        // Tọa độ Cây thông (Giữ nguyên)
+        const h = Math.random() * CONFIG.treeHeight;
+        const r = ((CONFIG.treeHeight - h) / CONFIG.treeHeight) * CONFIG.treeBaseRadius * Math.sqrt(Math.random());
+        const theta = Math.random() * Math.PI * 2;
+        treeT[i*3] = r * Math.cos(theta);
+        treeT[i*3+1] = h - CONFIG.treeHeight/2;
+        treeT[i*3+2] = r * Math.sin(theta);
 
-                // Tọa độ Bùng nổ
-                const rad = CONFIG.explodeRadius * Math.cbrt(Math.random());
-                const phi = Math.acos(2 * Math.random() - 1);
-                const lam = 2 * Math.PI * Math.random();
-                explodeT[i*3] = rad * Math.sin(phi) * Math.cos(lam);
-                explodeT[i*3+1] = rad * Math.sin(phi) * Math.sin(lam);
-                explodeT[i*3+2] = rad * Math.cos(phi);
+        // Tọa độ Bùng nổ (Giữ nguyên)
+        const rad = CONFIG.explodeRadius * Math.cbrt(Math.random());
+        const phi = Math.acos(2 * Math.random() - 1);
+        const lam = 2 * Math.PI * Math.random();
+        explodeT[i*3] = rad * Math.sin(phi) * Math.cos(lam);
+        explodeT[i*3+1] = rad * Math.sin(phi) * Math.sin(lam);
+        explodeT[i*3+2] = rad * Math.cos(phi);
 
-                pos[i*3] = treeT[i*3]; pos[i*3+1] = treeT[i*3+1]; pos[i*3+2] = treeT[i*3+2];
-            }
-            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-            geo.userData = { tree: treeT, explode: explodeT };
-            return new THREE.Points(geo, new THREE.PointsMaterial({ color: color, size: 0.5, transparent: true, blending: THREE.AdditiveBlending }));
-        }
+        // Tọa độ Hình trái tim (Mới)
+        const t = Math.random() * Math.PI * 2;
+        let hx = 16 * Math.pow(Math.sin(t), 3);
+        let hy = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+        const rFill = Math.pow(Math.random(), 0.5);
+        heartT[i*3] = hx * rFill * 2.2;
+        heartT[i*3+1] = hy * rFill * 2.2;
+        heartT[i*3+2] = (Math.random() - 0.5) * 10;
+
+        pos[i*3] = treeT[i*3]; pos[i*3+1] = treeT[i*3+1]; pos[i*3+2] = treeT[i*3+2];
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.userData = { tree: treeT, explode: explodeT, heart: heartT }; // Đăng ký heart
+    return new THREE.Points(geo, new THREE.PointsMaterial({ color: color, size: 0.6, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+}
 
         function animate() {
             requestAnimationFrame(animate);
@@ -191,23 +201,28 @@
             hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6 });
             
             hands.onResults(results => {
-                const cv = document.getElementById('camera-preview');
-                const ctx = cv.getContext('2d');
-                ctx.clearRect(0,0,cv.width, cv.height);
-                ctx.drawImage(results.image, 0, 0, cv.width, cv.height);
+    const cv = document.getElementById('camera-preview');
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0,0,cv.width, cv.height);
+    ctx.drawImage(results.image, 0, 0, cv.width, cv.height);
 
-                if (results.multiHandLandmarks.length > 0) {
-                    const lm = results.multiHandLandmarks[0];
-                    const openDist = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
-                    const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+    // KIỂM TRA TRÁI TIM (Khi có 2 tay)
+    if (results.multiHandLandmarks.length === 2) {
+        state = 'HEART';
+    } 
+    // KIỂM TRA CÁC TRẠNG THÁI KHÁC (Khi có 1 tay)
+    else if (results.multiHandLandmarks.length === 1) {
+        const lm = results.multiHandLandmarks[0];
+        const openDist = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
+        const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
 
-                    if (openDist < 0.25) state = 'TREE'; // Nắm tay
-                    else if (pinchDist < 0.06) state = 'PHOTO'; // Nhéo tay
-                    else state = 'EXPLODE'; // Xòe tay
-                } else {
-                    state = 'TREE';
-                }
-            });
+        if (openDist < 0.25) state = 'TREE';
+        else if (pinchDist < 0.06) state = 'PHOTO';
+        else state = 'EXPLODE';
+    } else {
+        state = 'TREE';
+    }
+});
 
             const cam = new Camera(video, { onFrame: async () => { await hands.send({image: video}); }, width: 640, height: 480 });
             cam.start();
