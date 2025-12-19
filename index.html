@@ -68,14 +68,33 @@
             titleMesh.position.set(0, 50, 0);
             scene.add(titleMesh);
 
-            // Star trên đỉnh cây
-            starMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(12, 12),
-                new THREE.MeshBasicMaterial({ color: 0xFFFF00, transparent: true, blending: THREE.AdditiveBlending })
-            );
-            starMesh.position.set(0, CONFIG.treeHeight/2 + 2, 0);
-            scene.add(starMesh);
+            // Ngôi sao 5 cánh lấp lánh
+    const starCanvas = document.createElement('canvas');
+    starCanvas.width = 128; starCanvas.height = 128;
+    const sCtx = starCanvas.getContext('2d');
+    
+    // Vẽ ngôi sao
+    sCtx.fillStyle = "#FFFF00"; 
+    sCtx.shadowColor = "#FFFFFF"; // Màu hào quang trắng
+    sCtx.shadowBlur = 20;         // Độ nhòe hào quang (tạo cảm giác sáng rực)
+    sCtx.beginPath();
+    const cx = 64, cy = 64, outer = 50, inner = 20;
+    for(let i = 0; i < 5; i++){
+        sCtx.lineTo(cx + Math.cos((18+i*72)/180*Math.PI)*outer, cy - Math.sin((18+i*72)/180*Math.PI)*outer);
+        sCtx.lineTo(cx + Math.cos((54+i*72)/180*Math.PI)*inner, cy - Math.sin((54+i*72)/180*Math.PI)*inner);
+    }
+    sCtx.closePath(); sCtx.fill();
 
+    const starTex = new THREE.CanvasTexture(starCanvas);
+    const starMat = new THREE.MeshBasicMaterial({ 
+        map: starTex, 
+        transparent: true, 
+        blending: THREE.AdditiveBlending 
+    });
+    
+    starMesh = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), starMat);
+    starMesh.position.set(0, CONFIG.treeHeight/2 + 2, 0);
+    scene.add(starMesh);
             // Text: I LOVE YOU
             const lCanvas = document.createElement('canvas');
             lCanvas.width = 1024; lCanvas.height = 256;
