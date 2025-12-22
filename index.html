@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Christmas Magic for Her</title>
+    <title>Grand Magic Christmas for Her</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
@@ -11,191 +11,174 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
     <style>
-        /* CSS kết hợp Project 1 & 7: Glassmorphism & Luxury Button */
-        :root { --gold: #FFD700; --red: #D32F2F; --glass: rgba(255, 255, 255, 0.1); }
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Cinzel', serif; }
+        /* Thẩm mỹ từ Project 1 & 7 */
+        :root { --gold: #FFD700; --bg: #050505; }
+        body { margin: 0; overflow: hidden; background: var(--bg); font-family: 'Cinzel', serif; }
 
-        #start-overlay {
-            position: fixed; inset: 0; z-index: 1000; background: radial-gradient(circle, #1a0505, #000);
-            display: flex; flex-direction: column; justify-content: center; align-items: center; transition: 1s;
+        /* Nút bấm từ Project 1 */
+        #start-screen {
+            position: fixed; inset: 0; z-index: 1000; background: radial-gradient(circle, #1a0a0a, #000);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .btn-magic {
+            background: var(--gold); color: #000; border: none; padding: 22px 65px;
+            font-size: 26px; font-weight: 900; border-radius: 60px; cursor: pointer;
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.4); transition: 0.5s;
+            letter-spacing: 4px; animation: glow 2s infinite;
+        }
+        .btn-magic:hover { transform: scale(1.1); background: #fff; box-shadow: 0 0 70px var(--gold); }
+
+        /* Giao diện Kính mờ (Glassmorphism) từ Project 7 */
+        #ui-layer {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px);
+            padding: 20px 40px; border-radius: 30px; border: 1px solid rgba(255, 215, 0, 0.2);
+            color: var(--gold); text-align: center; z-index: 100; opacity: 0; pointer-events: none;
         }
 
-        /* Magic Button from Project 1 */
-        .play-btn {
-            background: var(--gold); color: #000; border: none; padding: 20px 60px;
-            font-size: 24px; font-weight: 900; border-radius: 50px; cursor: pointer;
-            box-shadow: 0 0 40px rgba(255, 215, 0, 0.5); transition: 0.4s;
-            letter-spacing: 5px; animation: pulse 2s infinite;
-        }
-        .play-btn:hover { transform: scale(1.1) rotate(2deg); background: #fff; }
-
-        /* UI Panel from Project 7 */
-        #ui-panel {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: var(--glass); backdrop-filter: blur(15px); padding: 15px 30px;
-            border-radius: 20px; border: 1px solid rgba(255,215,0,0.2); color: var(--gold);
-            text-align: center; pointer-events: none; z-index: 100; opacity: 0;
-        }
-
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); } 70% { box-shadow: 0 0 0 30px rgba(255, 215, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); } }
-        #webcam-view { position: absolute; top: 20px; left: 20px; width: 150px; border-radius: 10px; transform: scaleX(-1); border: 1px solid var(--gold); opacity: 0.5; }
+        @keyframes glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        #webcam-view { position: absolute; top: 20px; left: 20px; width: 160px; border-radius: 12px; border: 1px solid var(--gold); opacity: 0.4; transform: scaleX(-1); }
     </style>
 </head>
 <body>
 
-    <div id="start-overlay">
-        <button class="play-btn" onclick="launchGift()">OPEN GIFT</button>
-        <p style="color: var(--gold); margin-top: 20px; letter-spacing: 2px;">A little magic for you</p>
+    <div id="start-screen">
+        <button class="btn-magic" onclick="startMagic()">BẮT ĐẦU PHÉP MÀU</button>
+        <p style="color: var(--gold); margin-top: 25px; font-size: 14px; opacity: 0.8;">Dành tặng người đặc biệt nhất của anh</p>
     </div>
 
-    <div id="ui-panel">
-        <div id="gesture-hint">Show your hand to interact...</div>
+    <div id="ui-layer">
+        <div id="status">Đang khởi tạo linh hồn của Giáng sinh...</div>
     </div>
 
     <video class="input_video" style="display:none"></video>
     <canvas id="webcam-view"></canvas>
-    <div id="container"></div>
+    <div id="scene-container"></div>
 
     <script>
-        // --- CHUẨN BỊ BIẾN TỪ CÁC PROJECT ---
-        let scene, camera, renderer, composer, clock = new THREE.Clock();
-        let particles, goldData, heartData, neuralData;
-        let state = 'TREE'; // TREE, HEART, NEURAL
-        
-        // Cấu hình tối ưu (Balanced)
-        const P_COUNT = 6000; 
+        let scene, camera, renderer, particles, clock = new THREE.Clock();
+        let pTree, pHeart, pNeural, pScatter;
+        let state = 'TREE'; 
+        const P_COUNT = 8000; // Cân bằng độ phức tạp và hiệu suất
 
-        async function launchGift() {
-            // Hiệu ứng chuyển cảnh trượt từ Project 3
-            gsap.to("#start-overlay", { y: "-100%", duration: 1.5, ease: "expo.inOut", onComplete: () => {
-                document.getElementById("ui-panel").style.opacity = 1;
-                initThree();
+        async function startMagic() {
+            // Chuyển cảnh chuyên nghiệp từ Project 3
+            gsap.to("#start-screen", { y: "-100%", duration: 1.2, ease: "power4.inOut", onComplete: () => {
+                document.getElementById("start-screen").style.display = "none";
+                gsap.to("#ui-layer", { opacity: 1, duration: 1 });
+                init3D();
                 initAI();
             }});
         }
 
-        // Toán học hình trái tim từ Project 5
-        function getHeartPoint(t) {
-            const x = 16 * Math.pow(Math.sin(t), 3);
-            const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
-            return new THREE.Vector3(x * 2.5, y * 2.5, (Math.random()-0.5) * 10);
+        function createPositions() {
+            pTree = new Float32Array(P_COUNT * 3);
+            pHeart = new Float32Array(P_COUNT * 3);
+            pNeural = new Float32Array(P_COUNT * 3);
+
+            for (let i = 0; i < P_COUNT; i++) {
+                // Logic Cây thông Grand Luxury (Project 6)
+                const h = Math.random() * 80;
+                const r = ((80 - h) / 80) * 35 * Math.sqrt(Math.random());
+                const angle = Math.random() * Math.PI * 2;
+                pTree[i*3] = r * Math.cos(angle);
+                pTree[i*3+1] = h - 40;
+                pTree[i*3+2] = r * Math.sin(angle);
+
+                // Logic Trái tim Neon (Project 5)
+                const t = (i / P_COUNT) * Math.PI * 2;
+                pHeart[i*3] = (16 * Math.pow(Math.sin(t), 3)) * 2.8;
+                pHeart[i*3+1] = (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * 2.8;
+                pHeart[i*3+2] = (Math.random() - 0.5) * 10;
+
+                // Logic Mạng lượng tử (Project 7)
+                const phi = Math.acos(2 * Math.random() - 1);
+                const theta = 2 * Math.PI * Math.random();
+                pNeural[i*3] = 45 * Math.sin(phi) * Math.cos(theta);
+                pNeural[i*3+1] = 45 * Math.sin(phi) * Math.sin(theta);
+                pNeural[i*3+2] = 45 * Math.cos(phi);
+            }
         }
 
-        function initThree() {
+        function init3D() {
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x000000, 0.008); // Fog từ Project 7
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 1000);
-            camera.position.set(0, 10, 100);
+            scene.fog = new THREE.FogExp2(0x000000, 0.005); // Chiều sâu từ Project 7
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.set(0, 15, 120);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
-            document.getElementById('container').appendChild(renderer.domElement);
+            document.getElementById('scene-container').appendChild(renderer.domElement);
 
-            // Tinh hoa Project 6: Grand Luxury Tree
+            createPositions();
+
             const geo = new THREE.BufferGeometry();
-            const pos = new Float32Array(P_COUNT * 3);
-            goldData = new Float32Array(P_COUNT * 3);
-            heartData = new Float32Array(P_COUNT * 3);
-            neuralData = new Float32Array(P_COUNT * 3);
-
-            for(let i=0; i<P_COUNT; i++) {
-                // Cây thông (Project 6)
-                const h = Math.random() * 70;
-                const r = ((70-h)/70) * 35 * Math.sqrt(Math.random());
-                const ang = Math.random() * Math.PI * 2;
-                goldData[i*3] = r * Math.cos(ang);
-                goldData[i*3+1] = h - 35;
-                goldData[i*3+2] = r * Math.sin(ang);
-
-                // Trái tim (Project 5)
-                const hp = getHeartPoint((i/P_COUNT) * Math.PI * 2);
-                heartData[i*3] = hp.x; heartData[i*3+1] = hp.y; heartData[i*3+2] = hp.z;
-
-                // Mạng thần kinh Sphere (Project 7)
-                const phi = Math.acos(2 * Math.random() - 1);
-                const theta = 2 * Math.PI * Math.random();
-                const sr = 40;
-                neuralData[i*3] = sr * Math.sin(phi) * Math.cos(theta);
-                neuralData[i*3+1] = sr * Math.sin(phi) * Math.sin(theta);
-                neuralData[i*3+2] = sr * Math.cos(phi);
-                
-                pos[i*3] = goldData[i*3]; pos[i*3+1] = goldData[i*3+1]; pos[i*3+2] = goldData[i*3+2];
-            }
-
-            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pTree), 3));
             
-            // Chất liệu hạt phát sáng (Bloom style Project 5)
+            // Texture phát sáng từ Project 5
             const mat = new THREE.PointsMaterial({
-                color: 0xFFD700, size: 0.8, transparent: true,
-                blending: THREE.AdditiveBlending, depthWrite: false
+                color: 0xFFD700, size: 0.9, transparent: true,
+                blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.8
             });
 
             particles = new THREE.Points(geo, mat);
             scene.add(particles);
 
+            // Thêm ánh sáng rực rỡ (Bloom effect logic)
+            const light = new THREE.PointLight(0xffaa00, 2, 100);
+            scene.add(light);
+
             animate();
         }
 
         function initAI() {
-            // MediaPipe Logic từ Project 8
             const video = document.getElementsByClassName('input_video')[0];
             const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
             
-            hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.8 });
+            hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.85 });
 
             hands.onResults(results => {
-                const hint = document.getElementById('gesture-hint');
+                const status = document.getElementById('status');
                 if (results.multiHandLandmarks && results.multiHandLandmarks.length === 2) {
                     state = 'HEART';
-                    hint.innerText = "❤️ Sending Love to You ❤️";
-                    gsap.to(particles.material.color, { r: 1, g: 0.2, b: 0.5 }); // Sang màu hồng Project 5
+                    status.innerText = "❤️ TRÁI TIM DÀNH CHO EM ❤️";
+                    gsap.to(particles.material.color, { r: 1, g: 0.1, b: 0.4 }); // Hồng Neon
                 } else if (results.multiHandLandmarks && results.multiHandLandmarks.length === 1) {
                     state = 'NEURAL';
-                    hint.innerText = "✨ Connected in our Souls ✨";
-                    gsap.to(particles.material.color, { r: 0.4, g: 0.7, b: 1 }); // Sang xanh Project 7
+                    status.innerText = "✨ KẾT NỐI LINH HỒN ✨";
+                    gsap.to(particles.material.color, { r: 0.2, g: 0.8, b: 1 }); // Xanh Lượng tử
                 } else {
                     state = 'TREE';
-                    hint.innerText = "🖐 Xòe tay: Mạng lưới | 🫶 2 tay: Trái tim";
-                    gsap.to(particles.material.color, { r: 1, g: 0.84, b: 0 }); // Vàng kim Project 6
+                    status.innerText = "✊ Nắm tay: Cây thông | 🫶 2 tay: Trái tim | 👋 Xòe tay: Vũ trụ";
+                    gsap.to(particles.material.color, { r: 1, g: 0.84, b: 0 }); // Vàng Kim
                 }
             });
 
-            const camera = new Camera(video, {
-                onFrame: async () => { await hands.send({image: video}); },
-                width: 640, height: 480
-            });
-            camera.start();
+            const cam = new Camera(video, { onFrame: async () => { await hands.send({image: video}); }, width: 640, height: 480 });
+            cam.start();
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            const dt = clock.getDelta();
             const time = clock.getElapsedTime();
-            const p = particles.geometry.attributes.position.array;
-            let target = goldData;
+            const pos = particles.geometry.attributes.position.array;
+            let target = pTree;
 
-            if (state === 'HEART') target = heartData;
-            else if (state === 'NEURAL') target = neuralData;
+            if (state === 'HEART') target = pHeart;
+            else if (state === 'NEURAL') target = pNeural;
 
-            // Hiệu ứng Morph mượt mà (Project 5 & 7 logic)
-            for(let i=0; i<p.length; i++) {
-                p[i] += (target[i] - p[i]) * 0.08;
-                // Thêm một chút Noise từ Project 7 để hạt sinh động
-                if(state === 'NEURAL') p[i] += Math.sin(time + i) * 0.05;
+            // Thuật toán Morphing mượt mà (Lerp)
+            for (let i = 0; i < pos.length; i++) {
+                let drift = (state === 'NEURAL') ? Math.sin(time + i) * 0.1 : 0;
+                pos[i] += (target[i] - pos[i]) * 0.07 + drift;
             }
 
             particles.geometry.attributes.position.needsUpdate = true;
-            particles.rotation.y += 0.005;
-            
+            particles.rotation.y += 0.004;
+
             renderer.render(scene, camera);
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
     </script>
 </body>
 </html>
