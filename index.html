@@ -8,7 +8,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; touch-action: none; }
@@ -20,52 +19,17 @@
         .controls-wrapper { position: absolute; top: 15px; right: 15px; pointer-events: auto; display: flex; flex-direction: column; gap: 10px; z-index: 150; }
         .upload-btn { background: rgba(0, 0, 0, 0.8); border: 1.2px solid #FFD700; color: #FFD700; padding: 8px 16px; cursor: pointer; font-size: clamp(10px, 2vw, 12px); border-radius: 8px; backdrop-filter: blur(8px); transition: 0.3s; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.06); } 100% { transform: scale(1); } }
-        #intro-section { position: fixed; inset: 0; z-index: 500; display: none; background: #000; }
-        .home__container { position: relative; height: 100vh; width: 100vw; overflow: hidden; }
-        .home__bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
-        .home__images img, .home__cloud-1, .home__cloud-2, .home__sled, .home__title { position: absolute; }
-        .home__images img { width: clamp(350px, 85vw, 950px); right: -10%; bottom: 0; max-width: initial; }
-        .home__title { bottom: 15%; left: 0; right: 0; text-align: center; color: #FFF; font-size: clamp(2.5rem, 12vw, 5rem); line-height: 1; text-shadow: 0 4px 10px rgba(0,0,0,0.5); font-family: 'Times New Roman', serif; }
-        .home__sled { width: clamp(120px, 25vw, 350px); top: 15%; left: -20%; z-index: 10; }
-        .home__cloud-1 { width: 80px; left: 5%; top: 8%; opacity: 0.8; }
-        .home__cloud-2 { width: 100px; right: 8%; top: 15%; opacity: 0.8; }
-        /* Hiệu ứng màn trập đen */
-        #shutter {
-            position: fixed;
-            inset: 0;
-            background: #000;
-            opacity: 0;
-            pointer-events: none;
-            z-index: 999; /* Luôn nằm trên cùng */
-        }
     </style>
 </head>
 <body>
     <div id="ui-layer">
         <div class="guide">🖐 Xòe tay: Xoay ảnh | 🫶 2 tay chụm: Love | ✊ Nắm tay: Cây thông | 🤏 Nhéo tay: Xem ảnh</div>
-        <button id="btnStart" onclick="handleStart()">START MAGIC</button>
+        <button id="btnStart" onclick="startSystem()">START MAGIC</button>
     </div>
-
-    <section id="intro-section">
-        <div id="shutter"></div>
-        <div class="home__container">
-            <img src="assets/img/img-bg.svg" class="home__bg">
-            <img src="assets/img/cloud-1.svg" class="home__cloud-1">
-            <img src="assets/img/cloud-2.svg" class="home__cloud-2">
-            <img src="assets/img/sled.svg" class="home__sled">
-            <div class="home__images">
-                <img src="assets/img/img-1.svg" class="home__img-1"> <img src="assets/img/img-2.svg" class="home__img-2">
-                <img src="assets/img/img-3.svg" class="home__img-3"> <img src="assets/img/img-4.svg" class="home__img-4">
-                <img src="assets/img/img-5.svg" class="home__img-5"> <img src="assets/img/img-6.svg" class="home__img-6">
-                <img src="assets/img/img-7.svg" class="home__img-7"> <img src="assets/img/img-8.svg" class="home__img-8">
-                <img src="assets/img/img-9.svg" class="home__img-9"> <img src="assets/img/img-10.svg" class="home__img-10">
-                <img src="assets/img/img-11.svg" class="home__img-11"> <img src="assets/img/img-12.svg" class="home__img-12">
-                <img src="assets/img/img-13.svg" class="home__img-13"> <img src="assets/img/img-14.svg" class="home__img-14">
-                <img src="assets/img/img-15.svg" class="home__img-15"> <img src="assets/img/img-16.svg" class="home__img-16">
-            </div>
-            <h1 class="home__title">Merry <br> Christmas</h1>
-        </div>
-    </section>
+    <div class="controls-wrapper" id="controls" style="display:none">
+        <label class="upload-btn">📁 Select Folder <input type="file" id="folder-input" webkitdirectory directory multiple></label>
+        <label class="upload-btn">🖼️ Select File <input type="file" id="file-input" multiple accept="image/*"></label>
+    </div>
     <div id="canvas-container"></div>
     <video class="input_video" style="display:none"></video>
     <canvas id="camera-preview"></canvas>
@@ -183,49 +147,11 @@
         });
         renderer.render(scene, camera);
     }
-    /* --- HÀM XỬ LÝ CHUYỂN CẢNH MỚI --- */
-    function handleStart() {
-        document.getElementById('ui-layer').style.display = 'none';
-        const intro = document.getElementById('intro-section');
-        const shutter = document.getElementById('shutter');
-        intro.style.display = 'block';
-        
-        bgMusic.play().catch(e => console.log("Music play error"));
 
-        const tl = gsap.timeline({
-            onComplete: () => {
-                // Hiệu ứng đóng màn trập đen trước khi chuyển cảnh
-                gsap.to('#shutter', {
-                    opacity: 1, 
-                    duration: 0.8, 
-                    onComplete: () => {
-                        intro.style.display = 'none';
-                        document.getElementById('ui-layer').style.display = 'block';
-                        document.getElementById('btnStart').style.display = 'none';
-                        
-                        // Khởi động AI trong lúc màn đen đang che
-                        startSystem(); 
-
-                        // Mở màn trập ra từ từ để lộ giao diện AI
-                        gsap.to('#shutter', { opacity: 0, duration: 1.2, delay: 0.5 });
-                    }
-                });
-            }
-        });
-
-        // Giữ nguyên các hiệu ứng Intro cũ của bạn
-        tl.from('.home__img-11', 1, {opacity: 0, y: 200, delay: .1})
-        .from('.home__img-14, .home__img-15, .home__img-16', 1, {opacity: 0, y: 200}, "-=0.5")
-        .from('.home__img-10', 1, {opacity: 0, y: 200, ease: "back.out(1.2)"}, "-=0.5")
-        .from('.home__img-1, .home__img-2, .home__img-3', 1, {opacity: 0, x: -100, rotation: -20, ease: "back.out(1.2)"}, "-=0.5")
-        .from('.home__title', 1, {opacity: 0, scale: 0.5, ease: "back.out(1.2)"}, "-=0.3");
-
-        gsap.to('.home__sled', { x: '150vw', duration: 10, repeat: -1, ease: "none" });
-    }
     async function startSystem() {
-        async function startSystem() {
-    document.getElementById('controls').style.display = 'flex';
-    // Đã play nhạc ở handleStart nên không cần gọi lại ở đây
+        document.getElementById('btnStart').style.display = 'none'; document.getElementById('controls').style.display = 'flex';
+        bgMusic.load(); 
+        bgMusic.play().then(() => console.log("Âm thanh đã bật")).catch(e => console.log("Chờ tương tác"));
 
         init3D();
         const video = document.getElementsByClassName('input_video')[0];
@@ -234,9 +160,9 @@
         // TỐI ƯU AI: TĂNG TIN CẬY ĐỂ BỎ QUA KHUÔN MẶT
         hands.setOptions({ 
             maxNumHands: 2, 
-            modelComplexity: isMobile ? 0 : 1, // Giảm độ phức tạp model trên mobile để tăng FPS
-            minDetectionConfidence: 0.7, 
-            minTrackingConfidence: 0.7 
+            modelComplexity: 1, 
+            minDetectionConfidence: 0.8, // Tăng độ chính xác
+            minTrackingConfidence: 0.8 
         });
 
         hands.onResults(results => {
@@ -244,16 +170,12 @@
             let active = false;
 
             if (results.multiHandLandmarks && results.multiHandLandmarks.length === 2) {
-                const h1 = results.multiHandLandmarks[0];
-                const h2 = results.multiHandLandmarks[1];
-                
-                // Tăng ngưỡng dIdx và dThm để mobile dễ nhận diện "LOVE" hơn
+                const h1 = results.multiHandLandmarks[0]; const h2 = results.multiHandLandmarks[1];
                 const dIdx = Math.hypot(h1[8].x - h2[8].x, h1[8].y - h2[8].y); 
                 const dThm = Math.hypot(h1[4].x - h2[4].x, h1[4].y - h2[4].y);
                 
-                const threshold = isMobile ? 0.35 : 0.28; // Mobile cần ngưỡng rộng hơn
-
-                if (dIdx < threshold && dThm < threshold) { 
+                // NHẬN DIỆN TRÁI TIM NHẠY HƠN VỚI NGƯỠNG MỚI
+                if (dIdx < 0.28 && dThm < 0.28) { 
                     state = 'HEART'; active = true; 
                 } else { 
                     state = 'EXPLODE'; active = true; 
